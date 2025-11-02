@@ -1,19 +1,31 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Eye, EyeOff, LogIn } from "lucide-react";
+import { Eye, EyeOff, LogIn, Loader2 } from "lucide-react";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  const { signIn, isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  const from = (location.state as any)?.from?.pathname || "/dashboard";
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && !authLoading) {
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, authLoading, navigate, from]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,27 +35,59 @@ const Login = () => {
       return;
     }
 
+    if (!email.includes("@")) {
+      toast.error("Format email tidak valid");
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error("Password minimal 6 karakter");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { error } = await signIn(email.trim().toLowerCase(), password);
 
-      if (error) throw error;
-
-      if (data.user) {
-        toast.success("Login berhasil!");
-        navigate("/dashboard");
+      if (error) {
+        console.error("Login error:", error);
+        
+        // Handle specific error messages
+        if (error.message.includes("Invalid login credentials")) {
+          toast.error("Email atau password salah");
+        } else if (error.message.includes("Email not confirmed")) {
+          toast.error("Email belum dikonfirmasi. Silakan cek inbox email Anda.");
+        } else if (error.message.includes("Too many requests")) {
+          toast.error("Terlalu banyak percobaan login. Coba lagi dalam beberapa menit.");
+        } else {
+          toast.error(error.message || "Terjadi kesalahan saat login");
+        }
+        return;
       }
+
+      toast.success("Login berhasil! Selamat datang kembali.");
+      // Navigation will be handled by useEffect when isAuthenticated becomes true
+      
     } catch (error: any) {
-      console.error("Login error:", error);
-      toast.error(error.message || "Email atau password salah");
+      console.error("Unexpected login error:", error);
+      toast.error("Terjadi kesalahan yang tidak terduga. Silakan coba lagi.");
     } finally {
       setLoading(false);
     }
   };
+
+  // Show loading while checking auth state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/10 p-4">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Memeriksa status login...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/10 p-4">
@@ -66,11 +110,12 @@ const Login = () => {
               <Input
                 id="email"
                 type="email"
-                placeholder="nama@contoh.com"
+                placeholder="admin@fahmyid.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
@@ -84,6 +129,7 @@ const Login = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
+                  disabled={loading}
                 />
                 <Button
                   type="button"
@@ -91,6 +137,7 @@ const Login = () => {
                   size="sm"
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
+                  disabled={loading}
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -105,9 +152,25 @@ const Login = () => {
               className="w-full bg-gradient-to-r from-primary to-primary-glow hover:opacity-90 transition-opacity"
               disabled={loading}
             >
-              {loading ? "Memproses..." : "Masuk"}
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Memproses...
+                </>
+              ) : (
+                "Masuk"
+              )}
             </Button>
           </form>
+          
+          {/* Development helper */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-4 p-3 bg-muted rounded-lg text-xs">
+              <p className="font-semibold mb-1">Test Account:</p>
+              <p>Email: admin@fahmyid.com</p>
+              <p>Password: admin123456</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
