@@ -10,6 +10,10 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Employees from "./pages/Employees";
 import NotFound from "./pages/NotFound";
+import DailyReport from "./pages/DailyReport";
+import Attendance from "./pages/Attendance";
+import Commission from "./pages/Commission";
+import Cashflow from "./pages/Cashflow";
 
 const queryClient = new QueryClient();
 
@@ -31,7 +35,7 @@ const App = () => (
                 </AppLayout>
               }
             />
-            {/* Placeholder routes for other pages */}
+            {/* Performance Tim & Individu */}
             <Route
               path="/performance"
               element={
@@ -43,50 +47,43 @@ const App = () => (
                 </AppLayout>
               }
             />
+            {/* Jurnal Laporan Harian - COMPLETED */}
             <Route
               path="/daily-report"
               element={
                 <AppLayout>
-                  <div className="p-6">
-                    <h1 className="text-3xl font-bold">Jurnal Laporan Harian</h1>
-                    <p className="text-muted-foreground mt-2">Halaman ini sedang dalam pengembangan</p>
-                  </div>
+                  <DailyReport />
                 </AppLayout>
               }
             />
+            {/* Absensi - COMPLETED */}
             <Route
               path="/attendance"
               element={
                 <AppLayout>
-                  <div className="p-6">
-                    <h1 className="text-3xl font-bold">Absensi</h1>
-                    <p className="text-muted-foreground mt-2">Halaman ini sedang dalam pengembangan</p>
-                  </div>
+                  <Attendance />
                 </AppLayout>
               }
             />
+            {/* Data Komisi Affiliate - COMPLETED */}
             <Route
               path="/commission"
               element={
                 <AppLayout>
-                  <div className="p-6">
-                    <h1 className="text-3xl font-bold">Data Komisi Affiliate</h1>
-                    <p className="text-muted-foreground mt-2">Halaman ini sedang dalam pengembangan</p>
-                  </div>
+                  <Commission />
                 </AppLayout>
               }
             />
+            {/* Cashflow / Arus Kas - COMPLETED */}
             <Route
               path="/cashflow"
               element={
                 <AppLayout>
-                  <div className="p-6">
-                    <h1 className="text-3xl font-bold">Cashflow / Arus Kas</h1>
-                    <p className="text-muted-foreground mt-2">Halaman ini sedang dalam pengembangan</p>
-                  </div>
+                  <Cashflow />
                 </AppLayout>
               }
             />
+            {/* Laba Rugi Bisnis */}
             <Route
               path="/profit-loss"
               element={
@@ -98,6 +95,7 @@ const App = () => (
                 </AppLayout>
               }
             />
+            {/* Saldo Hutang Piutang */}
             <Route
               path="/debt-receivable"
               element={
@@ -109,6 +107,7 @@ const App = () => (
                 </AppLayout>
               }
             />
+            {/* Management Karyawan - Already exists */}
             <Route
               path="/employees"
               element={
@@ -117,6 +116,7 @@ const App = () => (
                 </AppLayout>
               }
             />
+            {/* Inventaris Device Tim */}
             <Route
               path="/devices"
               element={
@@ -128,6 +128,7 @@ const App = () => (
                 </AppLayout>
               }
             />
+            {/* Daftar Akun Affiliate */}
             <Route
               path="/accounts"
               element={
@@ -139,6 +140,7 @@ const App = () => (
                 </AppLayout>
               }
             />
+            {/* Manage Group */}
             <Route
               path="/groups"
               element={
@@ -150,6 +152,7 @@ const App = () => (
                 </AppLayout>
               }
             />
+            {/* Management Asset */}
             <Route
               path="/assets"
               element={
@@ -161,6 +164,7 @@ const App = () => (
                 </AppLayout>
               }
             />
+            {/* SOP & Knowledge Center */}
             <Route
               path="/knowledge"
               element={
@@ -172,6 +176,7 @@ const App = () => (
                 </AppLayout>
               }
             />
+            {/* Goal & Target KPI */}
             <Route
               path="/kpi"
               element={
@@ -183,6 +188,7 @@ const App = () => (
                 </AppLayout>
               }
             />
+            {/* Pengaturan Akun Pribadi */}
             <Route
               path="/profile"
               element={
