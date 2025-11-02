@@ -1,191 +1,262 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, TrendingDown, Users, FolderKanban, Wallet } from "lucide-react";
-import { DashboardCharts } from "@/components/dashboard/DashboardCharts";
-import { EmployeeRanking } from "@/components/dashboard/EmployeeRanking";
+import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useDashboardMetrics, useDashboardCharts } from '@/hooks/useDashboardData';
+import { MetricCard } from '@/components/dashboard/MetricCard';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { 
+  TrendingUp, TrendingDown, DollarSign, CreditCard, Banknote, 
+  Users, Building, AlertCircle, CheckCircle2
+} from 'lucide-react';
+import { startOfMonth, endOfMonth } from 'date-fns';
 
 const Dashboard = () => {
-  // Fetch dashboard metrics
-  const { data: metrics, isLoading } = useQuery({
-    queryKey: ["dashboard-metrics"],
-    queryFn: async () => {
-      const [commissions, cashflow, employees, groups] = await Promise.all([
-        supabase
-          .from("commissions")
-          .select("gross_commission, net_commission, disbursed_commission")
-          .not("disbursed_commission", "is", null),
-        supabase.from("cashflow").select("type, amount"),
-        supabase.from("profiles").select("id", { count: "exact", head: true }),
-        supabase.from("groups").select("id", { count: "exact", head: true }),
-      ]);
+  const { user, hasRole } = useAuth();
+  const [selectedGroup, setSelectedGroup] = useState<string>('all');
+  const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
 
-      const totalGross = commissions.data?.reduce(
-        (sum, c) => sum + (c.gross_commission || 0),
-        0
-      ) || 0;
-      const totalNet = commissions.data?.reduce(
-        (sum, c) => sum + (c.net_commission || 0),
-        0
-      ) || 0;
-      const totalDisbursed = commissions.data?.reduce(
-        (sum, c) => sum + (c.disbursed_commission || 0),
-        0
-      ) || 0;
-      
-      const totalExpense = cashflow.data
-        ?.filter((c) => c.type === "expense")
-        .reduce((sum, c) => sum + c.amount, 0) || 0;
-
-      return {
-        totalGross,
-        totalNet,
-        totalDisbursed,
-        totalExpense,
-        totalEmployees: employees.count || 0,
-        totalGroups: groups.count || 0,
-      };
-    },
-  });
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(value);
+  // Use current month as default date range
+  const queryDateRange = {
+    start: startOfMonth(new Date()),
+    end: endOfMonth(new Date())
   };
 
-  const metricsData = [
-    {
-      title: "Total Komisi Kotor",
-      value: formatCurrency(metrics?.totalGross || 0),
-      change: "+12.5%",
-      trend: "up",
-      icon: DollarSign,
-    },
-    {
-      title: "Total Komisi Bersih",
-      value: formatCurrency(metrics?.totalNet || 0),
-      change: "+10.2%",
-      trend: "up",
-      icon: Wallet,
-    },
-    {
-      title: "Total Komisi Cair",
-      value: formatCurrency(metrics?.totalDisbursed || 0),
-      change: "+8.7%",
-      trend: "up",
-      icon: TrendingUp,
-    },
-    {
-      title: "Total Pengeluaran",
-      value: formatCurrency(metrics?.totalExpense || 0),
-      change: "+5.3%",
-      trend: "down",
-      icon: TrendingDown,
-    },
-    {
-      title: "Total Karyawan",
-      value: metrics?.totalEmployees || 0,
-      change: "",
-      trend: null,
-      icon: Users,
-    },
-    {
-      title: "Total Group",
-      value: metrics?.totalGroups || 0,
-      change: "",
-      trend: null,
-      icon: FolderKanban,
-    },
-  ];
+  const { 
+    data: metrics, 
+    isLoading: metricsLoading, 
+    error: metricsError 
+  } = useDashboardMetrics(queryDateRange);
 
-  if (isLoading) {
+  const { 
+    data: chartData, 
+    isLoading: chartsLoading, 
+    error: chartsError 
+  } = useDashboardCharts(queryDateRange);
+
+  // Calculate percentage changes
+  const calculateChange = (current: number, previous: number) => {
+    if (previous === 0) return { value: current, percentage: 0 };
+    const change = current - previous;
+    const percentage = (change / previous) * 100;
+    return { value: change, percentage };
+  };
+
+  const commissionGrossChange = metrics ? 
+    calculateChange(metrics.totalCommissionGross, metrics.previousMonthMetrics.totalCommissionGross) : 
+    null;
+
+  const commissionNetChange = metrics ? 
+    calculateChange(metrics.totalCommissionNet, metrics.previousMonthMetrics.totalCommissionNet) : 
+    null;
+
+  const commissionDisbursedChange = metrics ? 
+    calculateChange(metrics.totalCommissionDisbursed, metrics.previousMonthMetrics.totalCommissionDisbursed) : 
+    null;
+
+  const expensesChange = metrics ? 
+    calculateChange(metrics.totalExpenses, metrics.previousMonthMetrics.totalExpenses) : 
+    null;
+
+  if (metricsError || chartsError) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Overview performa affiliate marketing PT FAHMYID DIGITAL GROUP
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="p-6 text-center">
+          <AlertCircle className="h-12 w-12 mx-auto text-destructive mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Gagal Memuat Dashboard</h3>
+          <p className="text-muted-foreground mb-4">
+            Terjadi kesalahan saat memuat data dashboard. Silakan refresh halaman.
           </p>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="p-6">
-                <div className="h-24 bg-muted rounded"></div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+          <Button onClick={() => window.location.reload()}>
+            Refresh Halaman
+          </Button>
+        </Card>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Overview performa affiliate marketing PT FAHMYID DIGITAL GROUP
-        </p>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground">
+            Selamat datang kembali, {user?.profile?.full_name || user?.email?.split('@')[0] || 'User'}!
+          </p>
+        </div>
       </div>
 
-      {/* Metrics Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {metricsData.map((metric, index) => {
-          const Icon = metric.icon;
-          const isNegative = metric.trend === "down";
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">Filter Data</CardTitle>
+          <CardDescription>
+            Filter data berdasarkan group dan karyawan
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <label className="text-sm font-medium mb-2 block">Group</label>
+              <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih group" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Group</SelectItem>
+                  <SelectItem value="group1">Group A</SelectItem>
+                  <SelectItem value="group2">Group B</SelectItem>
+                  <SelectItem value="group3">Group C</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex-1">
+              <label className="text-sm font-medium mb-2 block">Karyawan</label>
+              <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih karyawan" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Karyawan</SelectItem>
+                  <SelectItem value="emp1">John Doe</SelectItem>
+                  <SelectItem value="emp2">Jane Smith</SelectItem>
+                  <SelectItem value="emp3">Michael Johnson</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-          return (
-            <Card
-              key={index}
-              className="shadow-card hover:shadow-elegant transition-shadow duration-300"
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  {metric.title}
-                </CardTitle>
-                <div
-                  className={`p-2 rounded-lg ${
-                    isNegative ? "bg-destructive/10" : "bg-primary/10"
-                  }`}
-                >
-                  <Icon
-                    className={`h-4 w-4 ${
-                      isNegative ? "text-destructive" : "text-primary"
-                    }`}
-                  />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{metric.value}</div>
-                {metric.change && (
-                  <p
-                    className={`text-xs flex items-center gap-1 mt-1 ${
-                      isNegative ? "text-destructive" : "text-success"
-                    }`}
-                  >
-                    {metric.trend === "up" ? (
-                      <TrendingUp className="h-3 w-3" />
-                    ) : (
-                      <TrendingDown className="h-3 w-3" />
-                    )}
-                    {metric.change} vs bulan lalu
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
+      {/* Metrics Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <MetricCard
+          title="Total Komisi Kotor"
+          value={metrics?.totalCommissionGross || 0}
+          change={commissionGrossChange}
+          icon={DollarSign}
+          iconColor="text-green-600"
+          loading={metricsLoading}
+          description="Komisi sebelum pemotongan"
+        />
+        
+        <MetricCard
+          title="Total Komisi Bersih"
+          value={metrics?.totalCommissionNet || 0}
+          change={commissionNetChange}
+          icon={CreditCard}
+          iconColor="text-blue-600"
+          loading={metricsLoading}
+          description="Komisi setelah pemotongan"
+        />
+        
+        <MetricCard
+          title="Total Komisi Cair"
+          value={metrics?.totalCommissionDisbursed || 0}
+          change={commissionDisbursedChange}
+          icon={Banknote}
+          iconColor="text-emerald-600"
+          loading={metricsLoading}
+          description="Komisi yang sudah dicairkan"
+        />
+        
+        <MetricCard
+          title="Total Pengeluaran"
+          value={metrics?.totalExpenses || 0}
+          change={expensesChange}
+          icon={TrendingDown}
+          iconColor="text-red-600"
+          loading={metricsLoading}
+          description="Pengeluaran operasional"
+        />
+        
+        <MetricCard
+          title="Total Karyawan"
+          value={metrics?.totalEmployees || 0}
+          icon={Users}
+          iconColor="text-purple-600"
+          loading={metricsLoading}
+          description="Karyawan aktif"
+        />
+        
+        <MetricCard
+          title="Total Group"
+          value={metrics?.totalGroups || 0}
+          icon={Building}
+          iconColor="text-indigo-600"
+          loading={metricsLoading}
+          description="Group yang terdaftar"
+        />
       </div>
 
-      {/* Charts Section */}
-      <DashboardCharts />
+      {/* Charts Section - Coming Soon */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Visualisasi Data</CardTitle>
+          <CardDescription>
+            Grafik dan chart akan segera hadir
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-muted-foreground">
+            <TrendingUp className="h-12 w-12 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Chart Sedang Dalam Pengembangan</h3>
+            <p>
+              Fitur visualisasi data berupa grafik tren omset, breakdown komisi, 
+              dan performa group akan segera tersedia.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Ranking Table */}
-      <EmployeeRanking />
+      {/* Quick Actions - Only visible to authorized roles */}
+      {hasRole(['superadmin', 'leader', 'admin']) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Aksi Cepat</CardTitle>
+            <CardDescription>
+              Shortcut ke fitur yang sering digunakan
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm">
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+                Tambah Komisi
+              </Button>
+              <Button variant="outline" size="sm">
+                <TrendingUp className="w-4 h-4 mr-2" />
+                Input Cashflow
+              </Button>
+              <Button variant="outline" size="sm">
+                <Users className="w-4 h-4 mr-2" />
+                Kelola Karyawan
+              </Button>
+              <Button variant="outline" size="sm">
+                <Building className="w-4 h-4 mr-2" />
+                Kelola Group
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Status Info for Development */}
+      <Card className="border-dashed border-2">
+        <CardContent className="pt-6">
+          <div className="text-center text-sm text-muted-foreground">
+            <p>
+              <strong>Status Development:</strong> Dashboard dasar sudah ready! 
+              Silakan setup database Supabase terlebih dahulu untuk melihat data real.
+            </p>
+            <p className="mt-2">
+              Phase selanjutnya: Implementasi chart visualisasi dan fitur-fitur core lainnya.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
